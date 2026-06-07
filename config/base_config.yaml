@@ -1,0 +1,30 @@
+identity:
+  name: router-netmiko
+
+bridges:
+  - name: bridge-lan
+  - name: bridge-wan
+
+vlans:
+  - name: vlan11-services
+    vlan_id: 11
+    interface: bridge-lan
+  - name: vlan12-cctv
+    vlan_id: 12
+    interface: bridge-lan
+  - name: vlan13-iot
+    vlan_id: 13
+    interface: bridge-lan
+  - name: vlan14-private
+    vlan_id: 14
+    interface: bridge-lan
+  - name: vlan15-guest
+    vlan_id: 15
+    interface: bridge-lan
+  - name: vlan16-management
+    vlan_id: 16
+    interface: bridge-lan
+
+# ip_addresses:
+#   - address: 192.168.88.1/24
+#     interface: bridge-lan

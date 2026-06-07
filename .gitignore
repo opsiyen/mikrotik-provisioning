@@ -1,5 +1,5 @@
 venv/
-.tryerror/
+.old/
 *.log
 __pycache__/
 .env

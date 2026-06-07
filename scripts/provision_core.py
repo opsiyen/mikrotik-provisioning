@@ -1,5 +1,6 @@
 import os
 import logging
+import yaml
 from datetime import datetime
 from netmiko import ConnectHandler
 from dotenv import load_dotenv
@@ -26,143 +27,96 @@ def load_credentials():
     }
 
 
-# ========== 2. Core Functions ==========
+# ========== 2. Core Functions (ensure, verify, apply_config)==========
 def connect_to_router(device_dict):
     try:
         conn = ConnectHandler(**device_dict)
-        logging.info(f"Terhubung ke {device_dict['host']}")
+        logging.info(f"󰌘 Terhubung ke {device_dict['host']}")
         return conn
     except Exception as e:
-        logging.error(f"Gagal koneksi: {e}")
+        logging.error(f"󰌙 Gagal koneksi: {e}")
         raise
 
 
-def read_commands(config_path="config/base_config.txt"):
+def read_yaml_config(config_path="config/base_config.yaml"):
     with open(config_path, "r") as f:
-        commands = [
-            line.strip() for line in f if line.strip() and not line.startswith("#")
-        ]
-    logging.info(f"Membaca {len(commands)} perintah dari {config_path}")
-    return commands
+        config = yaml.safe_load(f)
+    logging.info(f"󰑇 Membaca konfigurasi dari {config_path}")
+    return config
 
 
-def ensure_bridge_exists(conn, bridge_name, dry_run=False):
-    """Buat bridge hanya jika belum ada. Mode dry_run hanya mencetak."""
-    # Cek apakah bridge sudah ada
-    output = conn.send_command(f"/interface bridge print where name={bridge_name}")
-    if bridge_name in output:
-        logging.info(f"✅ Bridge '{bridge_name}' sudah ada, lewati pembuatan")
-        return
-    else:
-        if dry_run:
-            logging.info(f"[DRY-RUN] Akan membuat bridge '{bridge_name}'")
-        else:
-            logging.info(f"➕ Membuat bridge '{bridge_name}'")
-            conn.send_command(f"/interface bridge add name={bridge_name}")
-
-
+# ========== ensure top ==========
 def ensure_identity(conn, expected_name, dry_run=False):
     """Set identity hanya jika belum sesuai"""
     output = conn.send_command("/system identity print")
-    # Output biasanya "name: xxx"
+    # output biasanya "name: xxx"
     current_name = output.split(":")[1].strip() if "name:" in output else None
-
     if current_name == expected_name:
-        logging.info(f"✅ Identity sudah '{expected_name}', lewati perubahan")
+        logging.info(f"󰡕 Identity sudah '{expected_name}', lewati perubahan")
         return
     else:
         if dry_run:
             logging.info(
-                f"[DRY-RUN] Akan mengubah identity dari '{current_name}' menjadi '{expected_name}'"
+                f" Akan mengubah identity dari '{current_name}' menjadi '{expected_name}'"
             )
         else:
             logging.info(
-                f"🔄 Mengubah identity dari '{current_name}' menjadi '{expected_name}'"
+                f" Mengubah identity dari '{current_name}' menjadi '{expected_name}'"
             )
-            # Gunakan expect_string untuk mengantisipasi perubahan prompt
+            # expect_string untuk mengantisipasi perubahan prompt
             conn.send_command(
                 f"/system identity set name={expected_name}",
                 expect_string=r"\] >",
                 read_timeout=30,
             )
-            logging.info(f"Identity berhasil diubah menjadi '{expected_name}'")
+            logging.info(f"󰡕 Identity berhasil diubah menjadi '{expected_name}'")
+
+
+def ensure_bridge_exists(conn, bridge_name, dry_run=False):
+    """Buat bridge hanya jika belum ada. Mode dry_run hanya mencetak."""
+    # cek apakah bridge sudah ada
+    output = conn.send_command(f"/interface bridge print where name={bridge_name}")
+    if bridge_name in output:
+        logging.info(f"󰡕 Bridge '{bridge_name}' sudah ada, lewati pembuatan")
+        return
+    else:
+        if dry_run:
+            logging.info(f" Akan membuat bridge '{bridge_name}'")
+        else:
+            logging.info(f" Membuat bridge '{bridge_name}'")
+            conn.send_command(f"/interface bridge add name={bridge_name}")
 
 
 def ensure_vlan_exists(conn, vlan_name, vlan_id, interface, dry_run=False):
     """Buat vlan hanya jika belum ada. Mode dry_run hanya mencetak."""
-    # Cek apakah vlan sudah ada
+    # cek apakah vlan sudah ada
     output = conn.send_command(f"/interface vlan print where name={vlan_name}")
     if vlan_name in output and interface in output:
-        logging.info(
-            f"✅ vlan '{vlan_name}' sudah ada di {interface}, lewati pembuatan"
-        )
+        logging.info(f"󰡕 Vlan '{vlan_name}' sudah ada di {interface}, lewati pembuatan")
         return
     else:
         if dry_run:
             logging.info(
-                f"[DRY-RUN] Akan membuat vlan '{vlan_name}'(ID: {vlan_id}) di {interface}"
+                f" Akan membuat vlan '{vlan_name}'(ID: {vlan_id}) di {interface}"
             )
         else:
-            logging.info(f"➕ Membuat vlan '{vlan_name}'(ID: {vlan_id}) di {interface}")
+            logging.info(f" Membuat vlan '{vlan_name}'(ID: {vlan_id}) di {interface}")
             conn.send_command(
                 f"/interface vlan add name={vlan_name} vlan-id={vlan_id} interface={interface}"
             )
 
 
-def apply_commands(conn, commands, dry_run=False):
-    """Eksekusi perintah dengan idempotency dan penanganan khusus untuk set identity."""
-    for cmd in commands:
-        # Handle perintah add bridge secara idempotent
-        if cmd.startswith("/interface bridge add name="):
-            bridge_name = cmd.split("name=")[1].split()[0].strip()
-            ensure_bridge_exists(conn, bridge_name, dry_run)
-
-        # Handle perintah set identity (perubahan prompt)
-        elif cmd.startswith("/system identity set name="):
-            expected_name = cmd.split("name=")[1].split()[0].strip()
-            ensure_identity(conn, expected_name, dry_run)
-
-        # Handle perintah add vlan secara idempotent
-        elif cmd.startswith("/interface vlan add"):
-            # Ekstraksi parameter dengan aman
-            vlan_name = None
-            vlan_id = None
-            interface = None
-            parts = cmd.split()
-
-            for part in parts:
-                if part.startswith("name="):
-                    vlan_name = part.split("=")[1]
-                elif part.startswith("vlan-id="):
-                    vlan_id = part.split("=")[1]
-                elif part.startswith("interface="):
-                    interface = part.split("=")[1]
-
-            if vlan_name and vlan_id and interface:
-                ensure_vlan_exists(conn, vlan_name, vlan_id, interface, dry_run)
-            else:
-                logging.error(f"🚨 Format perintah VLAN tidak valid: {cmd}")
-
-        # Perintah lain
-        else:
-            if dry_run:
-                logging.info(f"[DRY-RUN] {cmd}")
-            else:
-                logging.info(f"Menjalankan: {cmd}")
-                output = conn.send_command(cmd)
-                if output:
-                    logging.debug(f"Output: {output}")
-
-
+# ========== ensure bottom ==========
+# ========== verify top ==========
 def verify_identity(conn, expected_name):
     """Verifikasi system identity sesuai harapan"""
     output = conn.send_command("/system identity print")
     # Output biasanya "name: xxx"
     if f"name: {expected_name}" in output:
-        logging.info(f"✅ Identity berhasil diubah menjadi '{expected_name}'")
+        logging.info(f"󰡕 Identity berhasil diubah menjadi '{expected_name}'")
         return True
     else:
-        logging.error(f"❌ Identity gagal: '{output}'")
+        logging.error(f"󰛉 Identity gagal: '{output}'")
         return False
 
 
@@ -171,10 +125,10 @@ def verify_bridge_exists(conn, bridge_name):
     output = conn.send_command(f"/interface bridge print where name={bridge_name}")
     # Jika bridge ditemukan, output tidak kosong
     if bridge_name in output:
-        logging.info(f"✅ Bridge '{bridge_name}' ditemukan")
+        logging.info(f"󰡕 Bridge '{bridge_name}' ditemukan")
         return True
     else:
-        logging.error(f"❌ Bridge '{bridge_name}' tidak ditemukan")
+        logging.error(f"󰛉 Bridge '{bridge_name}' tidak ditemukan")
         return False
 
 
@@ -183,11 +137,42 @@ def verify_vlan_exists(conn, vlan_name):
     output = conn.send_command(f"/interface vlan print where name={vlan_name}")
     # Jika vlan ditemukan, output tidak kosong
     if vlan_name in output:
-        logging.info(f"✅ vlan '{vlan_name}' ditemukan")
+        logging.info(f"󰡕 vlan '{vlan_name}' ditemukan")
         return True
     else:
-        logging.error(f"❌ vlan '{vlan_name}' tidak ditemukan")
+        logging.error(f"󰛉 vlan '{vlan_name}' tidak ditemukan")
         return False
+
+
+# ========== verify bottom ==========
+# ========== apply top ==========
+def apply_config(conn, config, dry_run=False):
+    """Terapkan konfigurasi dari dictionary YAML menggunakan fungsi-fungsi idempotent."""
+    # 1. Identity
+    if "identity" in config:
+        expected_name = config["identity"]["name"]
+        ensure_identity(conn, expected_name, dry_run)
+
+    # 2. Bridges
+    for bridge in config.get("bridges", []):
+        bridge_name = bridge["name"]
+        ensure_bridge_exists(conn, bridge_name, dry_run)
+
+    # 3. VLANs
+    for vlan in config.get("vlans", []):
+        vlan_name = vlan["name"]
+        vlan_id = vlan["vlan_id"]
+        interface = vlan["interface"]
+        ensure_vlan_exists(conn, vlan_name, vlan_id, interface, dry_run)
+
+    # # 4. IP Addresses
+    # for ip in config.get("ip_addresses", []):
+    #     address = ip["address"]
+    #     interface = ip["interface"]
+    #     ensure_ip_address(conn, address, interface, dry_run)
+
+
+# ========== apply bottom==========
 
 
 # ========== 3. Main ==========
@@ -206,8 +191,8 @@ def main():
         return
 
     conn = connect_to_router(device)
-    commands = read_commands()
-    apply_commands(conn, commands, dry_run)
+    commands = read_yaml_config()
+    apply_config(conn, commands, dry_run)
     conn.disconnect()
     logging.info("Provisioning selesai")
 
