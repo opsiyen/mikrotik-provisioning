@@ -106,6 +106,25 @@ def ensure_vlan_exists(conn, vlan_name, vlan_id, interface, dry_run=False):
             )
 
 
+def ensure_ip_address(conn, address, interface, dry_run=False):
+    """Buat ip address hanya jika belum ada. Mode dry_run hanya mencetak."""
+    # cek apakah ip address sudah ada
+    output = conn.send_command(f'/ip address print where address="{address}"')  # cek
+    if address in output and interface in output:
+        logging.info(
+            f"󰡕 Ip address '{address}' sudah ada di {interface}, lewati pembuatan"
+        )
+        return
+    else:
+        if dry_run:
+            logging.info(f" Akan membuat ip address '{address}' di {interface}")
+        else:
+            logging.info(f" Membuat ip address '{address}' di {interface}")
+            conn.send_command(
+                f"/ip address add address={address} interface={interface}"
+            )
+
+
 # ========== ensure bottom ==========
 # ========== verify top ==========
 def verify_identity(conn, expected_name):
@@ -144,6 +163,18 @@ def verify_vlan_exists(conn, vlan_name):
         return False
 
 
+def verify_ip_address_exists(conn, address):
+    """Verifikasi apakah ip address sudah ada"""
+    output = conn.send_command(f'/ip address print where name="{address}"')
+    # Jika ip address ditemukan, output tidak kosong
+    if address in output:
+        logging.info(f"󰡕 ip address '{address}' ditemukan")
+        return True
+    else:
+        logging.error(f"󰛉 ip address '{address}' tidak ditemukan")
+        return False
+
+
 # ========== verify bottom ==========
 # ========== apply top ==========
 def apply_config(conn, config, dry_run=False):
@@ -165,11 +196,11 @@ def apply_config(conn, config, dry_run=False):
         interface = vlan["interface"]
         ensure_vlan_exists(conn, vlan_name, vlan_id, interface, dry_run)
 
-    # # 4. IP Addresses
-    # for ip in config.get("ip_addresses", []):
-    #     address = ip["address"]
-    #     interface = ip["interface"]
-    #     ensure_ip_address(conn, address, interface, dry_run)
+    # 4. IP Addresses
+    for ip in config.get("ip_addresses", []):
+        address = ip["address"]
+        interface = ip["interface"]
+        ensure_ip_address(conn, address, interface, dry_run)
 
 
 # ========== apply bottom==========
@@ -187,14 +218,14 @@ def main():
 
     device = load_credentials()
     if not all([device["host"], device["username"], device["password"]]):
-        logging.error("Kredensial tidak lengkap")
+        logging.error(" Kredensial tidak lengkap")
         return
 
     conn = connect_to_router(device)
     commands = read_yaml_config()
     apply_config(conn, commands, dry_run)
     conn.disconnect()
-    logging.info("Provisioning selesai")
+    logging.info(" Provisioning selesai")
 
 
 if __name__ == "__main__":

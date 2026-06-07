@@ -25,6 +25,16 @@ vlans:
     vlan_id: 16
     interface: bridge-lan
 
-# ip_addresses:
-#   - address: 192.168.88.1/24
-#     interface: bridge-lan
+ip_addresses:
+  - address:   192.168.11.1/28
+    interface: vlan11-services
+  - address:   192.168.11.17/28
+    interface: vlan12-cctv
+  - address:   192.168.11.33/28
+    interface: vlan13-iot
+  - address:   192.168.11.49/28
+    interface: vlan14-private
+  - address:   192.168.11.65/28
+    interface: vlan15-guest
+  - address:   192.168.11.81/28
+    interface: vlan16-management
