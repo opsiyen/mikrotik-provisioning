@@ -1,3 +1,9 @@
 /system identity set name=router-netmiko
 /interface bridge add name=bridge-lan
 /interface bridge add name=bridge-wan
+/interface vlan add name=vlan11-services vlan-id=11 interface=bridge-lan
+/interface vlan add name=vlan12-cctv vlan-id=12 interface=bridge-lan
+/interface vlan add name=vlan13-iot vlan-id=13 interface=bridge-lan
+/interface vlan add name=vlan14-private vlan-id=14 interface=bridge-lan
+/interface vlan add name=vlan15-guest vlan-id=15 interface=bridge-lan
+/interface vlan add name=vlan16-management vlan-id=16 interface=bridge-lan

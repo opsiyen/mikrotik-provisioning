@@ -88,6 +88,27 @@ def ensure_identity(conn, expected_name, dry_run=False):
             logging.info(f"Identity berhasil diubah menjadi '{expected_name}'")
 
 
+def ensure_vlan_exists(conn, vlan_name, vlan_id, interface, dry_run=False):
+    """Buat vlan hanya jika belum ada. Mode dry_run hanya mencetak."""
+    # Cek apakah vlan sudah ada
+    output = conn.send_command(f"/interface vlan print where name={vlan_name}")
+    if vlan_name in output and interface in output:
+        logging.info(
+            f"✅ vlan '{vlan_name}' sudah ada di {interface}, lewati pembuatan"
+        )
+        return
+    else:
+        if dry_run:
+            logging.info(
+                f"[DRY-RUN] Akan membuat vlan '{vlan_name}'(ID: {vlan_id}) di {interface}"
+            )
+        else:
+            logging.info(f"➕ Membuat vlan '{vlan_name}'(ID: {vlan_id}) di {interface}")
+            conn.send_command(
+                f"/interface vlan add name={vlan_name} vlan-id={vlan_id} interface={interface}"
+            )
+
+
 def apply_commands(conn, commands, dry_run=False):
     """Eksekusi perintah dengan idempotency dan penanganan khusus untuk set identity."""
     for cmd in commands:
@@ -100,6 +121,27 @@ def apply_commands(conn, commands, dry_run=False):
         elif cmd.startswith("/system identity set name="):
             expected_name = cmd.split("name=")[1].split()[0].strip()
             ensure_identity(conn, expected_name, dry_run)
+
+        # Handle perintah add vlan secara idempotent
+        elif cmd.startswith("/interface vlan add"):
+            # Ekstraksi parameter dengan aman
+            vlan_name = None
+            vlan_id = None
+            interface = None
+            parts = cmd.split()
+
+            for part in parts:
+                if part.startswith("name="):
+                    vlan_name = part.split("=")[1]
+                elif part.startswith("vlan-id="):
+                    vlan_id = part.split("=")[1]
+                elif part.startswith("interface="):
+                    interface = part.split("=")[1]
+
+            if vlan_name and vlan_id and interface:
+                ensure_vlan_exists(conn, vlan_name, vlan_id, interface, dry_run)
+            else:
+                logging.error(f"🚨 Format perintah VLAN tidak valid: {cmd}")
 
         # Perintah lain
         else:
@@ -133,6 +175,18 @@ def verify_bridge_exists(conn, bridge_name):
         return True
     else:
         logging.error(f"❌ Bridge '{bridge_name}' tidak ditemukan")
+        return False
+
+
+def verify_vlan_exists(conn, vlan_name):
+    """Verifikasi apakah vlan dengan nama tertentu sudah ada"""
+    output = conn.send_command(f"/interface vlan print where name={vlan_name}")
+    # Jika vlan ditemukan, output tidak kosong
+    if vlan_name in output:
+        logging.info(f"✅ vlan '{vlan_name}' ditemukan")
+        return True
+    else:
+        logging.error(f"❌ vlan '{vlan_name}' tidak ditemukan")
         return False
 
 
