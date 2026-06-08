@@ -46,6 +46,19 @@ def read_yaml_config(config_path="config/base_config.yaml"):
 
 
 # ========== ensure top ==========
+def get_routeros_version(conn):
+    """Mengembalikan versi mayor RouterOS (6 atau 7)"""
+    output = conn.send_command("/system resource print")
+    # Cari baris yang mengandung "version:"
+    for line in output.splitlines():
+        if "version:" in line:
+            version_str = line.split(":")[1].strip()
+            # Misal "7.22.1" atau "6.49.19"
+            major = int(version_str.split(".")[0])
+            return major
+    raise Exception("Tidak dapat mendeteksi versi RouterOS")
+
+
 def ensure_identity(conn, expected_name, dry_run=False):
     """Set identity hanya jika belum sesuai"""
     output = conn.send_command("/system identity print")
@@ -57,7 +70,7 @@ def ensure_identity(conn, expected_name, dry_run=False):
     else:
         if dry_run:
             logging.info(
-                f" Akan mengubah identity dari '{current_name}' menjadi '{expected_name}'"
+                f" Akan mengubah identity dari '{current_name}' menjadi '{expected_name}'"
             )
         else:
             logging.info(
@@ -159,6 +172,57 @@ def ensure_list_member(conn, listm, interface, dry_run=False):
             conn.send_command(
                 f"/interface list member add list={listm} interface={interface}"
             )
+
+
+def ensure_ntp_client(conn, enabled, server, dry_run=False):
+    """Konfigurasi NTP client secara idempotent (support v6 dan v7)"""
+    version = get_routeros_version(conn)
+
+    # Baca konfigurasi saat ini
+    output = conn.send_command("/system ntp client print")
+    logging.debug(f"Output NTP print: {output}")
+
+    # Parsing berdasarkan versi
+    current_enabled = None
+    current_server = None
+    for line in output.splitlines():
+        if "enabled:" in line:
+            current_enabled = line.split(":")[1].strip()
+        if version == 7 and "servers:" in line:
+            current_server = line.split(":")[1].strip()
+        elif version == 6 and "server-dns-names:" in line:
+            current_server = line.split(":")[1].strip()
+
+    enabled_str = "yes" if enabled else "no"
+
+    # Cek apakah sudah sesuai
+    if current_enabled == enabled_str and current_server == server:
+        logging.info(
+            f"󰡕 NTP client sudah sesuai (enabled={enabled_str}, server={server})"
+        )
+        return
+
+    # Dry-run
+    if dry_run:
+        if version == 7:
+            cmd_display = (
+                f"/system ntp client set enabled={enabled_str} servers={server}"
+            )
+        else:
+            cmd_display = f"/system ntp client set enabled={enabled_str} server-dns-names={server}"
+        logging.info(f" Akan menjalankan: {cmd_display}")
+        return
+
+    # Eksekusi nyata
+    logging.info(
+        f" Mengatur NTP client: enabled={enabled_str}, server={server} (versi {version})"
+    )
+    if version == 7:
+        cmd = f"/system ntp client set enabled={enabled_str} servers={server}"
+    else:
+        cmd = f"/system ntp client set enabled={enabled_str} server-dns-names={server}"
+    conn.send_command(cmd, expect_string=r"\] >", read_timeout=30)
+    logging.info("NTP client berhasil dikonfigurasi")
 
 
 # ========== ensure bottom ==========
@@ -274,6 +338,11 @@ def apply_config(conn, config, dry_run=False):
         interface = list_member["interface"]
         ensure_list_member(conn, listm, interface, dry_run)
 
+    # 7. NTP Client
+    if "ntp_client" in config:
+        ntp = config["ntp_client"]
+        ensure_ntp_client(conn, ntp["enabled"], ntp["server"], dry_run)
+
 
 # ========== apply bottom==========
 
@@ -297,7 +366,7 @@ def main():
     commands = read_yaml_config()
     apply_config(conn, commands, dry_run)
     conn.disconnect()
-    logging.info(" Provisioning selesai")
+    logging.info(" Provisioning selesai")
 
 
 if __name__ == "__main__":

@@ -52,3 +52,7 @@ list_members:
     interface: vlan16-management
   - list     : disallow
     interface: vlan15-guest
+
+ntp_client:
+  enabled: yes
+  server : id.pool.ntp.org
