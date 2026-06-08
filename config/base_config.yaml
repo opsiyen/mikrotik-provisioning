@@ -6,35 +6,49 @@ bridges:
   - name: bridge-wan
 
 vlans:
-  - name: vlan11-services
-    vlan_id: 11
+  - name     : vlan11-services
+    vlan_id  : 11
     interface: bridge-lan
-  - name: vlan12-cctv
-    vlan_id: 12
+  - name     : vlan12-cctv
+    vlan_id  : 12
     interface: bridge-lan
-  - name: vlan13-iot
-    vlan_id: 13
+  - name     : vlan13-iot
+    vlan_id  : 13
     interface: bridge-lan
-  - name: vlan14-private
-    vlan_id: 14
+  - name     : vlan14-private
+    vlan_id  : 14
     interface: bridge-lan
-  - name: vlan15-guest
-    vlan_id: 15
+  - name     : vlan15-guest
+    vlan_id  : 15
     interface: bridge-lan
-  - name: vlan16-management
-    vlan_id: 16
+  - name     : vlan16-management
+    vlan_id  : 16
     interface: bridge-lan
 
 ip_addresses:
-  - address:   192.168.11.1/28
+  - address  : 192.168.11.1/28
     interface: vlan11-services
-  - address:   192.168.11.17/28
+  - address  : 192.168.11.17/28
     interface: vlan12-cctv
-  - address:   192.168.11.33/28
+  - address  : 192.168.11.33/28
     interface: vlan13-iot
-  - address:   192.168.11.49/28
+  - address  : 192.168.11.49/28
     interface: vlan14-private
-  - address:   192.168.11.65/28
+  - address  : 192.168.11.65/28
     interface: vlan15-guest
-  - address:   192.168.11.81/28
+  - address  : 192.168.11.81/28
     interface: vlan16-management
+
+interface_lists:
+  - name   : allow
+    comment: allow comment
+  - name   : disallow
+    comment: disallow comment
+
+list_members:
+  - list     : allow
+    interface: vlan14-private
+  - list     : allow
+    interface: vlan16-management
+  - list     : disallow
+    interface: vlan15-guest

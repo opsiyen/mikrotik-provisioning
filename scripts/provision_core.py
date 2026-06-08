@@ -72,7 +72,7 @@ def ensure_identity(conn, expected_name, dry_run=False):
             logging.info(f"󰡕 Identity berhasil diubah menjadi '{expected_name}'")
 
 
-def ensure_bridge_exists(conn, bridge_name, dry_run=False):
+def ensure_bridge(conn, bridge_name, dry_run=False):
     """Buat bridge hanya jika belum ada. Mode dry_run hanya mencetak."""
     # cek apakah bridge sudah ada
     output = conn.send_command(f"/interface bridge print where name={bridge_name}")
@@ -87,7 +87,7 @@ def ensure_bridge_exists(conn, bridge_name, dry_run=False):
             conn.send_command(f"/interface bridge add name={bridge_name}")
 
 
-def ensure_vlan_exists(conn, vlan_name, vlan_id, interface, dry_run=False):
+def ensure_vlan(conn, vlan_name, vlan_id, interface, dry_run=False):
     """Buat vlan hanya jika belum ada. Mode dry_run hanya mencetak."""
     # cek apakah vlan sudah ada
     output = conn.send_command(f"/interface vlan print where name={vlan_name}")
@@ -109,7 +109,7 @@ def ensure_vlan_exists(conn, vlan_name, vlan_id, interface, dry_run=False):
 def ensure_ip_address(conn, address, interface, dry_run=False):
     """Buat ip address hanya jika belum ada. Mode dry_run hanya mencetak."""
     # cek apakah ip address sudah ada
-    output = conn.send_command(f'/ip address print where address="{address}"')  # cek
+    output = conn.send_command(f'/ip address print where address="{address}"')
     if address in output and interface in output:
         logging.info(
             f"󰡕 Ip address '{address}' sudah ada di {interface}, lewati pembuatan"
@@ -122,6 +122,42 @@ def ensure_ip_address(conn, address, interface, dry_run=False):
             logging.info(f" Membuat ip address '{address}' di {interface}")
             conn.send_command(
                 f"/ip address add address={address} interface={interface}"
+            )
+
+
+def ensure_interface_list(conn, list_name, comment, dry_run=False):
+    """Buat list hanya jika belum ada. Mode dry_run hanya mencetak."""
+    # cek apakah list sudah ada
+    output = conn.send_command(f"/interface list print where name={list_name}")
+    if list_name in output:
+        logging.info(f"󰡕 List '{list_name}' sudah ada, lewati pembuatan")
+        return
+    else:
+        if dry_run:
+            logging.info(f" Akan membuat list '{list_name}'")
+        else:
+            logging.info(f" Membuat list '{list_name}'")
+            conn.send_command(
+                f'/interface list add name={list_name} comment="{comment}"'
+            )
+
+
+def ensure_list_member(conn, listm, interface, dry_run=False):
+    """Buat list member hanya jika belum ada. Mode dry_run hanya mencetak."""
+    # cek apakah list member sudah ada
+    output = conn.send_command(f"/interface list member print where list={listm}")
+    if listm in output and interface in output:
+        logging.info(
+            f"󰡕 List member '{listm}' sudah ada di {interface}, lewati pembuatan"
+        )
+        return
+    else:
+        if dry_run:
+            logging.info(f" Akan membuat list member '{listm}' di {interface}")
+        else:
+            logging.info(f" Membuat list member '{listm}' di {interface}")
+            conn.send_command(
+                f"/interface list member add list={listm} interface={interface}"
             )
 
 
@@ -175,6 +211,30 @@ def verify_ip_address_exists(conn, address):
         return False
 
 
+def verify_interface_list_exists(conn, list_name):
+    """Verifikasi apakah list dengan nama tertentu sudah ada"""
+    output = conn.send_command(f"/interface list print where name={list_name}")
+    # Jika list ditemukan, output tidak kosong
+    if list_name in output:
+        logging.info(f"󰡕 List '{list_name}' ditemukan")
+        return True
+    else:
+        logging.error(f"󰛉 List '{list_name}' tidak ditemukan")
+        return False
+
+
+def verify_list_member_exists(conn, list_member):
+    """Verifikasi apakah list dengan nama tertentu sudah ada"""
+    output = conn.send_command(f"/interface list member print where list={list_member}")
+    # Jika list ditemukan, output tidak kosong
+    if list_member in output:
+        logging.info(f"󰡕 List '{list_member}' ditemukan")
+        return True
+    else:
+        logging.error(f"󰛉 List '{list_member}' tidak ditemukan")
+        return False
+
+
 # ========== verify bottom ==========
 # ========== apply top ==========
 def apply_config(conn, config, dry_run=False):
@@ -187,20 +247,32 @@ def apply_config(conn, config, dry_run=False):
     # 2. Bridges
     for bridge in config.get("bridges", []):
         bridge_name = bridge["name"]
-        ensure_bridge_exists(conn, bridge_name, dry_run)
+        ensure_bridge(conn, bridge_name, dry_run)
 
     # 3. VLANs
     for vlan in config.get("vlans", []):
         vlan_name = vlan["name"]
         vlan_id = vlan["vlan_id"]
         interface = vlan["interface"]
-        ensure_vlan_exists(conn, vlan_name, vlan_id, interface, dry_run)
+        ensure_vlan(conn, vlan_name, vlan_id, interface, dry_run)
 
     # 4. IP Addresses
     for ip in config.get("ip_addresses", []):
         address = ip["address"]
         interface = ip["interface"]
         ensure_ip_address(conn, address, interface, dry_run)
+
+    # 5. Interface List
+    for interface_list in config.get("interface_lists", []):
+        list_name = interface_list["name"]
+        comment = interface_list["comment"]
+        ensure_interface_list(conn, list_name, comment, dry_run)
+
+    # 6. List Member
+    for list_member in config.get("list_members", []):
+        listm = list_member["list"]
+        interface = list_member["interface"]
+        ensure_list_member(conn, listm, interface, dry_run)
 
 
 # ========== apply bottom==========
