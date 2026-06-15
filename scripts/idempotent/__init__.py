@@ -9,6 +9,7 @@ from .lists import ensure_interface_list_exists, ensure_list_member_exists
 from .ip_pool import ensure_ip_pool_exists
 from .dhcp_server import ensure_dhcp_server
 from .ntp_client import ensure_ntp_client
+from .neighboar_macserver import ensure_neighbor_discovery
 
 
 def apply_all(conn, config, dry_run=False):
@@ -90,3 +91,8 @@ def apply_all(conn, config, dry_run=False):
     if "ntp_client" in config:
         ntp = config["ntp_client"]
         ensure_ntp_client(conn, ntp["enabled"], ntp["server"], dry_run)
+
+    # Neighbor Discovery
+    if "neighbor_discovery" in config:
+        nd_cfg = config["neighbor_discovery"]
+        ensure_neighbor_discovery(conn, nd_cfg["allowed_interface_list"], dry_run)

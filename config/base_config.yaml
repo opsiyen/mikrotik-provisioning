@@ -19,10 +19,6 @@ list_members:
   - list     : disallow
     interface: vlan15-guest
 
-ntp_client:
-  enabled: yes
-  server : id.pool.ntp.org
-
 bridge_ports:
   - bridge   : bridge-wan
     interface: ether1
@@ -140,3 +136,11 @@ dhcp_server:
     gateway     : 192.168.11.81
     dns         : 1.1.1.1
     lease_time  : 10m
+
+neighbor_discovery:
+  allowed_interface_list: allow
+
+ntp_client:
+  enabled: yes
+  server : id.pool.ntp.org
+
