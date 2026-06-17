@@ -1,7 +1,10 @@
 import logging
 
 
-def ensure_ip_address_exists(conn, address, interface, dry_run=False):
+def ensure_ip_address_exists(conn, ip_addr_cfg, dry_run=False):
+    address = ip_addr_cfg["address"]
+    interface = ip_addr_cfg["interface"]
+
     """Buat ip address hanya jika belum ada. Mode dry_run hanya mencetak."""
     # cek apakah ip address sudah ada
     output = conn.send_command(f'/ip address print where address="{address}"')

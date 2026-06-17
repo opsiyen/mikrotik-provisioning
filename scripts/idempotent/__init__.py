@@ -21,14 +21,12 @@ def apply_all(conn, config, dry_run=False):
         ensure_identity(conn, config["identity"]["name"], dry_run)
 
     # 2. BRIDGES - OK
-    for bridge in config.get("bridges", []):
-        ensure_bridge_exists(conn, bridge["name"], dry_run)
+    for bridge_cfg in config.get("bridges", []):
+        ensure_bridge_exists(conn, bridge_cfg, dry_run)
 
     # 3. BRIDGE PORT - OK
-    for bridge_port in config.get("bridge_ports", []):
-        ensure_bridge_port_exists(
-            conn, bridge_port["interface"], bridge_port["bridge"], dry_run
-        )
+    for bridge_port_cfg in config.get("bridge_ports", []):
+        ensure_bridge_port_exists(conn, bridge_port_cfg, dry_run)
 
     # 4. DHCP CLIENT - OK
     if "dhcp_client" in config:
@@ -58,34 +56,28 @@ def apply_all(conn, config, dry_run=False):
         )
 
     # 7. VLANs - OK
-    for vlan in config.get("vlans", []):
-        ensure_vlan_exists(
-            conn, vlan["name"], vlan["vlan_id"], vlan["interface"], dry_run
-        )
+    for vlan_cfg in config.get("vlans", []):
+        ensure_vlan_exists(conn, vlan_cfg, dry_run)
 
     # 8. IP ADDRESS - OK
-    for ip in config.get("ip_addresses", []):
-        ensure_ip_address_exists(conn, ip["address"], ip["interface"], dry_run)
+    for ip_addr_cfg in config.get("ip_addresses", []):
+        ensure_ip_address_exists(conn, ip_addr_cfg, dry_run)
 
     # 9. IP POOL - OK
-    for ip in config.get("ip_pool", []):
-        ensure_ip_pool_exists(conn, ip["name"], ip["ranges"], dry_run)
+    for pool_cfg in config.get("ip_pool", []):
+        ensure_ip_pool_exists(conn, pool_cfg, dry_run)
 
     # 10. DHCP SERVER -
     for dhcp_config in config.get("dhcp_server", []):
         ensure_dhcp_server(conn, dhcp_config, dry_run)
 
     # 11. INTERFACE LIST - OK
-    for interface_list in config.get("interface_lists", []):
-        ensure_interface_list_exists(
-            conn, interface_list["name"], interface_list["comment"], dry_run
-        )
+    for list_cfg in config.get("interface_lists", []):
+        ensure_interface_list_exists(conn, list_cfg, dry_run)
 
     # 12. LIST MEMBER - OK
-    for list_member in config.get("list_members", []):
-        ensure_list_member_exists(
-            conn, list_member["list"], list_member["interface"], dry_run
-        )
+    for list_member_cfg in config.get("list_members", []):
+        ensure_list_member_exists(conn, list_member_cfg, dry_run)
 
     # 13. NTP CLIENT - OK
     if "ntp_client" in config:
